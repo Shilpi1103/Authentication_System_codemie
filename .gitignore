@@ -1,0 +1,13 @@
+# Never commit MCP credentials — see the Security notice in README.md
+.vscode/mcp.json
+
+# Live workflow state is a per-run working file; docs/sample-run/ is committed deliberately
+docs/*.json
+
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+.tmp-*
