@@ -1,5 +1,79 @@
 # Authentication_System_codemie
 
+## Playwright automation (Page Object Model)
+
+The TypeScript browser suite tests this application's registration, password login,
+OTP login, protected dashboard, and logout flows in Google Chrome only.
+Authentication API responses are intercepted with Playwright, so these are frontend
+browser tests, not live backend integration tests. MongoDB, SMTP, and a running
+backend are not required; synthetic credentials and OTPs never authenticate real users.
+
+```text
+playwright.config.ts          Browser projects, reports, base URL, local web server
+tsconfig.json                Strict TypeScript checks for automation
+tests/
+  pages/                     Locators and user actions, without test assertions
+    LoginPage.ts
+    RegisterPage.ts
+    DashboardPage.ts
+  fixtures/
+    test.ts                  Test-scoped page objects and Playwright expect
+    mockApi.ts               Explicit, per-test authentication API mocks
+  data/
+    users.ts                 Synthetic users, credentials, session, and OTP
+  specs/
+    login.spec.ts
+    register.spec.ts
+    otp.spec.ts
+    dashboard.spec.ts
+```
+
+### Setup and run
+
+Run from the repository root with Node.js 22.12+ (required by Vite):
+
+```powershell
+npm ci
+npm --prefix mern-jwt-auth/frontend ci
+npx playwright install chrome
+npm run test:e2e:typecheck
+npm run test:e2e
+```
+
+Playwright starts the frontend automatically at `http://127.0.0.1:5173`.
+An existing local server at that address is reused outside CI.
+
+```powershell
+npm run test:e2e -- --project=chrome
+npm run test:e2e:headed -- --project=chrome
+npm run test:e2e:ui
+npm run test:e2e:report
+```
+
+To test an already-running frontend instead of starting the local server:
+
+```powershell
+$env:PLAYWRIGHT_BASE_URL = 'http://localhost:5173'
+npm run test:e2e -- --project=chrome
+Remove-Item Env:PLAYWRIGHT_BASE_URL
+```
+
+The included tests still mock authentication APIs when using a custom base URL.
+For live integration tests, import the page-object fixtures without calling
+`mockAuthResponse`, and provision appropriate backend services and test accounts.
+
+### Adding test cases
+
+Import `test` and `expect` from `tests/fixtures/test.ts`, request the needed page
+object in the test arguments, and keep assertions in the spec. Put reusable
+locators and UI actions in the corresponding page class. Fixtures create fresh
+page objects for each test; Playwright isolates cookies and local storage.
+Use labels and accessible roles instead of fragile CSS selectors where available.
+Configure API responses explicitly in each test before triggering the request.
+
+HTML reports are written to `playwright-report/`; failure screenshots, videos,
+and retry traces are written to `test-results/`. Both directories are ignored by Git.
+
 
 
 ## Getting started
