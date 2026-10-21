@@ -182,3 +182,20 @@
     border-right-color: var(--border);
   }
 }
+
+/* ── KAN-142: Accessible focus states / aria-live stability ──
+   NOTE: App.css is not currently imported by main.jsx/App.jsx (only
+   index.css is). These rules are added here to follow the KAN-142 design
+   doc's file list; the functional styles that affect the rendered app
+   live in index.css. */
+.btn-primary:focus-visible,
+.btn-resend:focus-visible,
+.link-button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* ARIA live region - visually stable so layout doesn't shift on update */
+[aria-live] {
+  position: relative;
+}

@@ -230,3 +230,88 @@ body {
   color: #6b7280;
   padding: 1rem 0;
 }
+
+/* ── KAN-142: Inline validation, Resend OTP, accessible focus states ── */
+
+/* Inline per-field error messages shown next to inputs */
+.inline-error {
+  display: block;
+  color: #b91c1c;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+/* Countdown timer box (aria-live region) */
+.countdown {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Resend OTP button */
+.btn-resend {
+  width: 100%;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btn-resend:hover:not(:disabled) {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.btn-resend:disabled {
+  background-color: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+/* Link-style button used for "Login with OTP" / "Back" toggles */
+.link-button {
+  background: none;
+  border: none;
+  color: #4f46e5;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+/* Accessible focus-visible states for keyboard users */
+.btn-primary:focus-visible,
+.btn-resend:focus-visible,
+.link-button:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Invalid input visual state (aria-invalid="true") */
+.form-group input[aria-invalid="true"] {
+  border-color: #f87171;
+}
+
+.form-group input[aria-invalid="true"]:focus {
+  border-color: #ef4444;
+  outline: 2px solid #fca5a5;
+}

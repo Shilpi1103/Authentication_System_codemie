@@ -187,3 +187,149 @@ describe('Login.jsx OTP UI', () => {
     expect(await screen.findByText(/too many otp requests/i)).toBeInTheDocument();
   });
 });
+
+describe('Login.jsx KAN-142 inline validation, focus, resend, and a11y', () => {
+  test('shows inline error and focuses email input when Send OTP clicked with empty email', async () => {
+    renderLogin();
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+
+    const emailInput = screen.getByLabelText(/email/i);
+    expect(screen.getByText(/email is required/i)).toBeInTheDocument();
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    expect(emailInput).toHaveFocus();
+    expect(sendOtp).not.toHaveBeenCalled();
+  });
+
+  test('shows inline error for a malformed email and clears it once corrected', async () => {
+    renderLogin();
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'not-an-email' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+
+    expect(screen.getByText(/please enter a valid email address/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@example.com' } });
+    expect(screen.queryByText(/please enter a valid email address/i)).not.toBeInTheDocument();
+  });
+
+  test('focuses the OTP input automatically on entering the verify step', async () => {
+    sendOtp.mockResolvedValueOnce({ status: 200, data: {} });
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@example.com' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+
+    expect(await screen.findByLabelText(/enter otp/i)).toHaveFocus();
+  });
+
+  test('shows inline error and focuses OTP input when Verify clicked with empty OTP', async () => {
+    sendOtp.mockResolvedValueOnce({ status: 200, data: {} });
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@example.com' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /verify otp/i }));
+    });
+
+    const otpInput = screen.getByLabelText(/enter otp/i);
+    expect(screen.getByText(/otp is required/i)).toBeInTheDocument();
+    expect(otpInput).toHaveAttribute('aria-invalid', 'true');
+    expect(otpInput).toHaveFocus();
+    expect(verifyOtp).not.toHaveBeenCalled();
+  });
+
+  test('shows inline error for an OTP that is not 4 digits', async () => {
+    sendOtp.mockResolvedValueOnce({ status: 200, data: {} });
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@example.com' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+    fireEvent.change(screen.getByLabelText(/enter otp/i), { target: { value: '12' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /verify otp/i }));
+    });
+
+    expect(screen.getByText(/otp must be exactly 4 digits/i)).toBeInTheDocument();
+    expect(verifyOtp).not.toHaveBeenCalled();
+  });
+
+  test('Resend OTP button is disabled until the countdown reaches 0', async () => {
+    vi.useFakeTimers();
+    sendOtp.mockResolvedValueOnce({ status: 200, data: {} });
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@example.com' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+
+    const resendButton = screen.getByRole('button', { name: /resend otp/i });
+    expect(resendButton).toBeDisabled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(resendButton).toBeEnabled();
+  });
+
+  test('clicking Resend OTP calls sendOtp again and resets the countdown', async () => {
+    vi.useFakeTimers();
+    sendOtp.mockResolvedValue({ status: 200, data: {} });
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@example.com' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    const resendButton = screen.getByRole('button', { name: /resend otp/i });
+    await act(async () => {
+      fireEvent.click(resendButton);
+    });
+
+    expect(sendOtp).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/Time remaining: 60s/)).toBeInTheDocument();
+    expect(resendButton).toBeDisabled();
+    expect(screen.getByLabelText(/enter otp/i)).toHaveValue('');
+  });
+
+  test('countdown region has aria-live="polite" and aria-atomic="true" for screen readers', async () => {
+    sendOtp.mockResolvedValueOnce({ status: 200, data: {} });
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: /login with otp/i }));
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'jane@example.com' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    });
+
+    const countdown = screen.getByText(/Time remaining/);
+    expect(countdown).toHaveAttribute('aria-live', 'polite');
+    expect(countdown).toHaveAttribute('aria-atomic', 'true');
+  });
+});
