@@ -11,6 +11,10 @@ export class LoginPage {
   readonly sendOtpButton: Locator;
   readonly otpInput: Locator;
   readonly verifyOtpButton: Locator;
+  readonly resendOtpButton: Locator;
+  readonly emailInlineError: Locator;
+  readonly otpInlineError: Locator;
+  readonly countdown: Locator;
 
   constructor(readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Welcome Back' });
@@ -23,6 +27,10 @@ export class LoginPage {
     this.sendOtpButton = page.getByRole('button', { name: 'Send OTP', exact: true });
     this.otpInput = page.getByLabel('Enter OTP', { exact: true });
     this.verifyOtpButton = page.getByRole('button', { name: 'Verify OTP', exact: true });
+    this.resendOtpButton = page.getByRole('button', { name: 'Resend OTP', exact: true });
+    this.emailInlineError = page.locator('#email-error');
+    this.otpInlineError = page.locator('#otp-error');
+    this.countdown = page.locator('[aria-live="polite"]');
   }
 
   async goto() {
@@ -44,5 +52,9 @@ export class LoginPage {
   async verifyOtp(otp: string) {
     await this.otpInput.fill(otp);
     await this.verifyOtpButton.click();
+  }
+
+  async resendOtp() {
+    await this.resendOtpButton.click();
   }
 }

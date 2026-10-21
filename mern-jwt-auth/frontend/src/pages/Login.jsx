@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { loginUser, sendOtp, verifyOtp } from '../services/authService';
 
@@ -8,7 +8,7 @@ function Login() {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(false);
 
-  // OTP login state (FR-016–FR-020)
+  // OTP login state (FR-016 to FR-020)
   const [otpStep, setOtpStep] = useState('password');
   const [otpEmail, setOtpEmail] = useState('');
   const [otpValue, setOtpValue] = useState('');
@@ -16,12 +16,38 @@ function Login() {
   const [otpMessage, setOtpMessage] = useState({ text: '', type: '' });
   const [otpLoading, setOtpLoading] = useState(false);
 
+  // Inline per-field validation state (KAN-142)
+  const [emailError, setEmailError] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [resendEnabled, setResendEnabled] = useState(false);
+
+  // Focus management refs (KAN-142)
+  const emailInputRef = useRef(null);
+  const otpInputRef = useRef(null);
+
+  // Countdown ticking - unchanged behaviour, runs while in the verify step.
   useEffect(() => {
     if (otpStep !== 'otp-verify') return undefined;
     const interval = setInterval(() => {
       setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
+  }, [otpStep]);
+
+  // Enable the Resend OTP button once the countdown reaches 0 (KAN-142).
+  useEffect(() => {
+    if (otpStep !== 'otp-verify') {
+      setResendEnabled(false);
+      return;
+    }
+    setResendEnabled(countdown <= 0);
+  }, [countdown, otpStep]);
+
+  // Focus the OTP input as soon as the user reaches the verify step (KAN-142).
+  useEffect(() => {
+    if (otpStep === 'otp-verify') {
+      otpInputRef.current?.focus();
+    }
   }, [otpStep]);
 
   const handleChange = (e) =>
@@ -57,6 +83,9 @@ function Login() {
     setOtpEmail('');
     setOtpValue('');
     setOtpMessage({ text: '', type: '' });
+    setEmailError('');
+    setOtpError('');
+    setResendEnabled(false);
   };
 
   const otpErrorMessage = (status, serverMessage) => {
@@ -78,11 +107,29 @@ function Login() {
     return serverMessage || 'An unexpected error occurred.';
   };
 
+  // Inline validation helpers (KAN-142)
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) return 'Email is required.';
+    if (!emailRegex.test(email)) return 'Please enter a valid email address.';
+    return '';
+  };
+
+  const validateOtp = (otp) => {
+    if (!otp) return 'OTP is required.';
+    if (!/^\d{4}$/.test(otp)) return 'OTP must be exactly 4 digits.';
+    return '';
+  };
+
   const handleSendOtp = async (e) => {
     e.preventDefault();
-    if (!otpEmail) {
-      return setOtpMessage({ text: 'Please enter a valid email address.', type: 'error' });
+    const validationError = validateEmail(otpEmail);
+    if (validationError) {
+      setEmailError(validationError);
+      emailInputRef.current?.focus();
+      return;
     }
+    setEmailError('');
 
     setOtpLoading(true);
     try {
@@ -103,9 +150,13 @@ function Login() {
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
-    if (!/^\d{4}$/.test(otpValue)) {
-      return setOtpMessage({ text: 'OTP must be exactly 4 digits.', type: 'error' });
+    const validationError = validateOtp(otpValue);
+    if (validationError) {
+      setOtpError(validationError);
+      otpInputRef.current?.focus();
+      return;
     }
+    setOtpError('');
 
     setOtpLoading(true);
     try {
@@ -117,11 +168,34 @@ function Login() {
     } catch (err) {
       const serverMessage = err.response?.data?.message || 'An unexpected error occurred.';
       if (/invalidated/i.test(serverMessage)) {
-        // AC-022: attempts exhausted — restart from email entry
+        // AC-022: attempts exhausted - restart from email entry
         setOtpStep('otp-email');
         setOtpValue('');
+        setOtpError('');
       }
       setOtpMessage({ text: serverMessage, type: 'error' });
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // Explicit Resend OTP control (KAN-142), enabled once countdown reaches 0.
+  const handleResendOtp = async () => {
+    setOtpError('');
+    setOtpValue('');
+    setOtpLoading(true);
+    try {
+      await sendOtp({ email: otpEmail });
+      setCountdown(60);
+      setResendEnabled(false);
+      setOtpMessage({ text: 'OTP resent successfully!', type: 'success' });
+      otpInputRef.current?.focus();
+    } catch (err) {
+      const status = err.response?.status;
+      setOtpMessage({
+        text: otpErrorMessage(status, err.response?.data?.message),
+        type: 'error',
+      });
     } finally {
       setOtpLoading(false);
     }
@@ -180,13 +254,24 @@ function Login() {
               <div className="form-group">
                 <label htmlFor="otpEmail">Email</label>
                 <input
+                  ref={emailInputRef}
                   id="otpEmail"
                   type="email"
                   name="otpEmail"
                   placeholder="Enter your email"
                   value={otpEmail}
-                  onChange={(e) => setOtpEmail(e.target.value)}
+                  onChange={(e) => {
+                    setOtpEmail(e.target.value);
+                    setEmailError('');
+                  }}
+                  aria-invalid={emailError ? 'true' : 'false'}
+                  aria-describedby={emailError ? 'email-error' : undefined}
                 />
+                {emailError && (
+                  <span id="email-error" className="inline-error" role="alert">
+                    {emailError}
+                  </span>
+                )}
               </div>
               <button type="submit" className="btn-primary" disabled={otpLoading}>
                 {otpLoading ? 'Sending...' : 'Send OTP'}
@@ -207,19 +292,46 @@ function Login() {
               <div className="form-group">
                 <label htmlFor="otpValue">Enter OTP</label>
                 <input
+                  ref={otpInputRef}
                   id="otpValue"
                   type="text"
                   name="otpValue"
                   inputMode="numeric"
                   pattern="[0-9]{4}"
                   placeholder="4-digit OTP"
+                  maxLength="4"
                   value={otpValue}
-                  onChange={(e) => setOtpValue(e.target.value)}
+                  onChange={(e) => {
+                    setOtpValue(e.target.value);
+                    setOtpError('');
+                  }}
+                  aria-invalid={otpError ? 'true' : 'false'}
+                  aria-describedby={otpError ? 'otp-error' : 'countdown-timer'}
                 />
+                {otpError && (
+                  <span id="otp-error" className="inline-error" role="alert">
+                    {otpError}
+                  </span>
+                )}
               </div>
-              <p className="countdown">Time remaining: {countdown}s</p>
+              <p
+                id="countdown-timer"
+                className="countdown"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                Time remaining: {countdown}s
+              </p>
               <button type="submit" className="btn-primary" disabled={otpLoading}>
                 {otpLoading ? 'Verifying...' : 'Verify OTP'}
+              </button>
+              <button
+                type="button"
+                className="btn-resend"
+                onClick={handleResendOtp}
+                disabled={!resendEnabled || otpLoading}
+              >
+                Resend OTP
               </button>
             </form>
             <p className="auth-link">
